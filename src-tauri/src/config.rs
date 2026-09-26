@@ -1,12 +1,17 @@
-//! User settings and prompt slots, persisted as JSON in the app config dir.
+//! User settings and prompt profiles, persisted as JSON in the app config dir.
 
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
 pub const SLOT_COUNT: usize = 8;
-pub const DEFAULT_HOTKEY: &str = "Alt+KeyQ";
+pub const DEFAULT_HOTKEY: &str = "Alt+KeyF";
+/// v1 default; too close to Cmd+Q (quit), so it's migrated to DEFAULT_HOTKEY.
+const OLD_DEFAULT_HOTKEY: &str = "Alt+KeyQ";
+const CONFIG_VERSION: u32 = 2;
 const LOADOUT_TYPE: &str = "prompt-wheel-loadout";
+pub const MIN_SCALE: f64 = 0.7;
+pub const MAX_SCALE: f64 = 1.4;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -42,6 +47,15 @@ impl Slot {
     }
 }
 
+/// A named set of 8 slots. Users switch between profiles to swap whole wheels.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Profile {
+    pub id: String,
+    pub name: String,
+    pub slots: Vec<Slot>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -49,29 +63,74 @@ pub struct Config {
     pub hotkey: String,
     pub activation: Activation,
     pub placement: Placement,
-    pub slots: Vec<Slot>,
+    /// Wheel size multiplier, MIN_SCALE..=MAX_SCALE.
+    pub wheel_scale: f64,
+    pub profiles: Vec<Profile>,
+    pub active_profile: String,
+    /// v1 stored a single set of slots here; read once and moved into a profile.
+    #[serde(skip_serializing)]
+    slots: Option<Vec<Slot>>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: CONFIG_VERSION,
             hotkey: DEFAULT_HOTKEY.into(),
             activation: Activation::default(),
             placement: Placement::default(),
-            slots: default_slots(),
+            wheel_scale: 1.0,
+            profiles: vec![Profile { id: "default".into(), name: "Coding".into(), slots: default_slots() }],
+            active_profile: "default".into(),
+            slots: None,
         }
     }
 }
 
 impl Config {
-    /// Always exactly SLOT_COUNT slots, whatever the file contained.
+    /// Upgrades older files and repairs anything out of range.
     pub fn normalized(mut self) -> Self {
-        self.slots.resize(SLOT_COUNT, Slot::default());
+        // Missing fields are filled from Default, so a v1 file arrives with the
+        // default profile in place; replace it with the user's own slots.
+        if let Some(slots) = self.slots.take() {
+            if self.version < 2 {
+                self.profiles = vec![Profile { id: "default".into(), name: "Coding".into(), slots }];
+                self.active_profile = "default".into();
+            }
+        }
+        if self.version < 2 && self.hotkey == OLD_DEFAULT_HOTKEY {
+            self.hotkey = DEFAULT_HOTKEY.into();
+        }
+        self.version = CONFIG_VERSION;
+
         if self.hotkey.trim().is_empty() {
             self.hotkey = DEFAULT_HOTKEY.into();
         }
+        if !self.wheel_scale.is_finite() || self.wheel_scale == 0.0 {
+            self.wheel_scale = 1.0;
+        }
+        self.wheel_scale = self.wheel_scale.clamp(MIN_SCALE, MAX_SCALE);
+
+        if self.profiles.is_empty() {
+            self.profiles = Config::default().profiles;
+        }
+        for (i, profile) in self.profiles.iter_mut().enumerate() {
+            profile.slots.resize(SLOT_COUNT, Slot::default());
+            if profile.id.trim().is_empty() {
+                profile.id = format!("profile-{i}");
+            }
+            if profile.name.trim().is_empty() {
+                profile.name = format!("Profile {}", i + 1);
+            }
+        }
+        if !self.profiles.iter().any(|p| p.id == self.active_profile) {
+            self.active_profile = self.profiles[0].id.clone();
+        }
         self
+    }
+
+    pub fn active(&self) -> &Profile {
+        self.profiles.iter().find(|p| p.id == self.active_profile).unwrap_or(&self.profiles[0])
     }
 }
 

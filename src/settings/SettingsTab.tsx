@@ -1,7 +1,10 @@
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { Wheel } from "../components/Wheel";
+import { api } from "../shared/api";
 import { segmentPath } from "../shared/geometry";
 import { hotkeyParts } from "../shared/hotkey";
-import type { Activation, Config, Placement } from "../shared/types";
+import { activeProfile, BASE_RADIUS, MAX_SCALE, MIN_SCALE, type Activation, type Config, type Placement } from "../shared/types";
 import { HotkeyRecorder, Keycaps } from "./HotkeyRecorder";
 
 interface Props {
@@ -10,7 +13,7 @@ interface Props {
   onHotkey: (accelerator: string) => Promise<string | null>;
 }
 
-export function BehaviorTab({ config, onChange, onHotkey }: Props) {
+export function SettingsTab({ config, onChange, onHotkey }: Props) {
   const keys = hotkeyParts(config.hotkey);
   return (
     <div className="behavior">
@@ -18,10 +21,13 @@ export function BehaviorTab({ config, onChange, onHotkey }: Props) {
         <section className="card">
           <div className="card-head">
             <h2>Shortcut</h2>
-            <p className="muted">The key combination that brings up the wheel, from any app.</p>
+            <p className="muted">
+              The key combo or mouse button (middle, thumb buttons…) that brings up the wheel, from any app.
+            </p>
           </div>
           <HotkeyRecorder value={config.hotkey} onSave={onHotkey} />
         </section>
+        <GeneralCard />
         <section className="card">
           <div className="card-head">
             <h2>Try it</h2>
@@ -89,8 +95,90 @@ export function BehaviorTab({ config, onChange, onHotkey }: Props) {
             </Option>
           </div>
         </section>
+        <WheelSizeCard config={config} onChange={onChange} />
       </div>
     </div>
+  );
+}
+
+function GeneralCard() {
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getAutostart().then(setAutostart);
+  }, []);
+
+  const toggle = async () => {
+    setError(null);
+    try {
+      setAutostart(await api.setAutostart(!autostart));
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>General</h2>
+      </div>
+      <div className="setting-row">
+        <div>
+          <strong>Open at login</strong>
+          <p className="muted">Start Prompt Wheel automatically when you log in to your Mac.</p>
+        </div>
+        <Toggle on={Boolean(autostart)} disabled={autostart === null} onChange={toggle} label="Open at login" />
+      </div>
+      {error && <p className="field-error">{error}</p>}
+    </section>
+  );
+}
+
+function Toggle({ on, disabled, onChange, label }: { on: boolean; disabled?: boolean; onChange: () => void; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} className={`toggle${on ? " is-on" : ""}`} disabled={disabled} onClick={onChange}>
+      <motion.span className="toggle-knob" layout transition={{ type: "spring", stiffness: 700, damping: 35 }} />
+    </button>
+  );
+}
+
+function WheelSizeCard({ config, onChange }: { config: Config; onChange: (changes: Partial<Config>) => void }) {
+  const percent = Math.round(config.wheelScale * 100);
+  return (
+    <section className="card">
+      <div className="card-head size-head">
+        <h2>Wheel size</h2>
+        <span className="size-value">
+          {percent}%
+          {percent !== 100 && (
+            <button className="link-btn" onClick={() => onChange({ wheelScale: 1 })}>
+              Reset
+            </button>
+          )}
+        </span>
+      </div>
+      {/* The real wheel at its real size, shrunk as a whole so proportions stay true. */}
+      <div className="size-preview">
+        <div className="size-preview-scale">
+          <Wheel slots={activeProfile(config).slots} radius={BASE_RADIUS.cursor * config.wheelScale} hot={0} />
+        </div>
+      </div>
+      <div className="slider-row">
+        <span className="slider-end">Small</span>
+        <input
+          type="range"
+          className="slider"
+          min={MIN_SCALE * 100}
+          max={MAX_SCALE * 100}
+          step={5}
+          value={percent}
+          onChange={(e) => onChange({ wheelScale: Number(e.target.value) / 100 })}
+          style={{ "--fill": `${((percent - MIN_SCALE * 100) / ((MAX_SCALE - MIN_SCALE) * 100)) * 100}%` } as React.CSSProperties}
+        />
+        <span className="slider-end">Large</span>
+      </div>
+    </section>
   );
 }
 

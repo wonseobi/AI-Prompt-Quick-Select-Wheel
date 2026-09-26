@@ -1,19 +1,28 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../shared/api";
+import { api, on } from "../shared/api";
 import { hotkeyParts } from "../shared/hotkey";
-import type { Config, Slot } from "../shared/types";
-import { BehaviorTab } from "./BehaviorTab";
+import { activeProfile, emptySlots, newProfileId, type Config, type Loadout, type Profile, type Slot } from "../shared/types";
 import { Keycaps } from "./HotkeyRecorder";
 import { LoadoutsTab } from "./LoadoutsTab";
+import { SettingsTab } from "./SettingsTab";
 import { SlotsTab } from "./SlotsTab";
 
-type Tab = "slots" | "behavior" | "loadouts";
+type Tab = "slots" | "settings" | "loadouts";
 const TABS: { id: Tab; label: string }[] = [
   { id: "slots", label: "Slots" },
-  { id: "behavior", label: "Behavior" },
+  { id: "settings", label: "Settings" },
   { id: "loadouts", label: "Loadouts" },
 ];
+
+/** "Coding" -> "Coding 2" if taken, and so on. */
+function uniqueName(base: string, profiles: Profile[]) {
+  const taken = new Set(profiles.map((p) => p.name));
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
+}
 const SAVE_DELAY = 400;
 
 type Toast = { id: number; message: string; tone: "ok" | "error" };
@@ -94,6 +103,51 @@ export function SettingsApp() {
     [notify],
   );
 
+  // Profile picked from the menu bar while settings is open.
+  useEffect(() => on("config://external", (external) => update({ activeProfile: external.activeProfile })), [update]);
+
+  const profiles = {
+    switchTo: (id: string) => update({ activeProfile: id }),
+    add: (profile: Profile) => {
+      const list = configRef.current?.profiles ?? [];
+      update({ profiles: [...list, profile], activeProfile: profile.id });
+    },
+    setSlots: (slots: Slot[]) => {
+      const cfg = configRef.current!;
+      update({ profiles: cfg.profiles.map((p) => (p.id === cfg.activeProfile ? { ...p, slots } : p)) });
+    },
+    rename: (name: string) => {
+      const cfg = configRef.current!;
+      update({ profiles: cfg.profiles.map((p) => (p.id === cfg.activeProfile ? { ...p, name } : p)) });
+    },
+    remove: () => {
+      const cfg = configRef.current!;
+      if (cfg.profiles.length < 2) return;
+      const index = cfg.profiles.findIndex((p) => p.id === cfg.activeProfile);
+      const rest = cfg.profiles.filter((p) => p.id !== cfg.activeProfile);
+      const removed = cfg.profiles[index];
+      update({ profiles: rest, activeProfile: rest[Math.max(0, index - 1)].id });
+      notify(`Deleted “${removed.name}”`);
+    },
+  };
+
+  const createProfile = () => {
+    const list = configRef.current!.profiles;
+    profiles.add({ id: newProfileId(), name: uniqueName("New profile", list), slots: emptySlots() });
+  };
+
+  const duplicateProfile = () => {
+    const cfg = configRef.current!;
+    const source = activeProfile(cfg);
+    profiles.add({ id: newProfileId(), name: uniqueName(`${source.name} copy`, cfg.profiles), slots: structuredClone(source.slots) });
+  };
+
+  const importLoadout = (loadout: Loadout, mode: "new" | "replace") => {
+    if (mode === "replace") return profiles.setSlots(loadout.slots);
+    const list = configRef.current!.profiles;
+    profiles.add({ id: newProfileId(), name: uniqueName(loadout.name.trim() || "Imported", list), slots: loadout.slots });
+  };
+
   if (!config) return <div className="app loading" />;
 
   return (
@@ -119,7 +173,7 @@ export function SettingsApp() {
               </motion.span>
             )}
           </AnimatePresence>
-          <button className="shortcut-pill" onClick={() => setTab("behavior")} title="Change shortcut">
+          <button className="shortcut-pill" onClick={() => setTab("settings")} title="Change shortcut">
             <Keycaps parts={hotkeyParts(config.hotkey)} />
             <span>{config.activation === "hold" ? "hold" : "toggle"}</span>
           </button>
@@ -156,9 +210,28 @@ export function SettingsApp() {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           >
-            {tab === "slots" && <SlotsTab slots={config.slots} onChange={(slots: Slot[]) => update({ slots })} />}
-            {tab === "behavior" && <BehaviorTab config={config} onChange={update} onHotkey={saveHotkey} />}
-            {tab === "loadouts" && <LoadoutsTab slots={config.slots} onImport={(slots) => update({ slots })} notify={notify} />}
+            {tab === "slots" && (
+              <SlotsTab
+                profiles={config.profiles}
+                activeId={config.activeProfile}
+                onSlotsChange={profiles.setSlots}
+                onSwitch={profiles.switchTo}
+                onCreate={createProfile}
+                onDuplicate={duplicateProfile}
+                onRename={profiles.rename}
+                onDelete={profiles.remove}
+              />
+            )}
+            {tab === "settings" && <SettingsTab config={config} onChange={update} onHotkey={saveHotkey} />}
+            {tab === "loadouts" && (
+              <LoadoutsTab
+                key={config.activeProfile}
+                profileName={activeProfile(config).name}
+                slots={activeProfile(config).slots}
+                onImport={importLoadout}
+                notify={notify}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

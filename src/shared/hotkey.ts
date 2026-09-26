@@ -1,5 +1,6 @@
 // Hotkeys are stored as accelerator strings the Rust side can parse,
-// e.g. "Alt+KeyQ" or "Super+Shift+Space" (key names are KeyboardEvent.code).
+// e.g. "Alt+KeyF" or "Super+Shift+Space" (key names are KeyboardEvent.code),
+// or a mouse button: "Mouse3" (middle), "Mouse4" (back), "Mouse5" (forward)…
 
 const isMac = navigator.userAgent.includes("Mac");
 
@@ -36,9 +37,25 @@ export function keyLabel(code: string): string {
   return KEY_LABELS[code] ?? code;
 }
 
-/** "Alt+KeyQ" -> ["⌥", "Q"] for rendering as keycaps. */
+const MOUSE_LABELS: Record<string, string> = {
+  Mouse3: "Middle click",
+  Mouse4: "Mouse 4 · Back",
+  Mouse5: "Mouse 5 · Forward",
+};
+
+export const isMouseHotkey = (accelerator: string) => /^Mouse\d+$/.test(accelerator);
+
+/** "Alt+KeyF" -> ["⌥", "F"] for rendering as keycaps. */
 export function hotkeyParts(accelerator: string): string[] {
+  if (isMouseHotkey(accelerator)) return [`🖱 ${MOUSE_LABELS[accelerator] ?? accelerator.replace("Mouse", "Mouse ")}`];
   return accelerator.split("+").map((token) => MODIFIER_LABELS[token] ?? keyLabel(token));
+}
+
+/** Browser MouseEvent.button -> "MouseN", or null for left/right click. */
+export function mouseButtonHotkey(button: number): string | null {
+  if (button === 1) return "Mouse3";
+  if (button >= 3) return `Mouse${button + 1}`;
+  return null;
 }
 
 const MODIFIER_CODES = new Set([

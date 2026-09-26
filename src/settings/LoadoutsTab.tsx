@@ -4,8 +4,10 @@ import { api } from "../shared/api";
 import { isEmpty, type Loadout, type Slot } from "../shared/types";
 
 interface Props {
+  profileName: string;
   slots: Slot[];
-  onImport: (slots: Slot[]) => void;
+  /** "new" adds the loadout as its own profile; "replace" overwrites the current one. */
+  onImport: (loadout: Loadout, mode: "new" | "replace") => void;
   notify: (message: string, tone?: "ok" | "error") => void;
 }
 
@@ -29,14 +31,14 @@ function SlotChips({ slots }: { slots: Slot[] }) {
   );
 }
 
-export function LoadoutsTab({ slots, onImport, notify }: Props) {
-  const [name, setName] = useState("My loadout");
+export function LoadoutsTab({ profileName, slots, onImport, notify }: Props) {
+  const [name, setName] = useState(profileName);
   const [description, setDescription] = useState("");
   const [incoming, setIncoming] = useState<Loadout | null>(null);
 
   const exportIt = async () => {
     try {
-      if (await api.exportLoadout(name.trim() || "My loadout", description, slots)) notify("Loadout exported");
+      if (await api.exportLoadout(name.trim() || profileName, description, slots)) notify("Loadout exported");
     } catch (err) {
       notify(String(err), "error");
     }
@@ -51,24 +53,24 @@ export function LoadoutsTab({ slots, onImport, notify }: Props) {
     }
   };
 
-  const apply = () => {
+  const apply = (mode: "new" | "replace") => {
     if (!incoming) return;
-    onImport(incoming.slots);
-    notify(`“${incoming.name || "Loadout"}” is now on your wheel`);
+    onImport(incoming, mode);
+    notify(mode === "new" ? `Added “${incoming.name || "Loadout"}” as a new profile` : `“${profileName}” now uses this loadout`);
     setIncoming(null);
   };
 
   return (
     <div className="loadouts">
       <p className="lede">
-        A loadout is a small JSON file with your 8 slots. Share yours, or import someone else's. Loadouts never include
-        your shortcut or other settings.
+        A loadout is a small JSON file with one profile's 8 slots. Share yours, or import someone else's as a new
+        profile. Loadouts never include your shortcut or other settings.
       </p>
 
       <div className="loadout-grid">
         <section className="card">
           <div className="card-head">
-            <h2>Export your wheel</h2>
+            <h2>Export “{profileName}”</h2>
           </div>
           <label className="field">
             <span className="field-label">Name</span>
@@ -98,13 +100,15 @@ export function LoadoutsTab({ slots, onImport, notify }: Props) {
                   {incoming.description && <p className="muted">{incoming.description}</p>}
                 </div>
                 <SlotChips slots={incoming.slots} />
-                <p className="warn-note">This replaces all 8 of your current slots.</p>
                 <div className="btn-row">
                   <button className="btn ghost" onClick={() => setIncoming(null)}>
                     Cancel
                   </button>
-                  <button className="btn primary" onClick={apply}>
-                    Replace my slots
+                  <button className="btn ghost" onClick={() => apply("replace")} title={`Overwrites the slots in “${profileName}”`}>
+                    Replace “{profileName}”
+                  </button>
+                  <button className="btn primary" onClick={() => apply("new")}>
+                    Add as new profile
                   </button>
                 </div>
               </motion.div>

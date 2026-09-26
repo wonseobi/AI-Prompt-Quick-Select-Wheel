@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Wheel } from "../components/Wheel";
 import { api, on } from "../shared/api";
 import { angleOf, slotFromVector, unwrapAngle } from "../shared/geometry";
-import { isEmpty, type OpenPayload } from "../shared/types";
+import { BASE_RADIUS, isEmpty, type OpenPayload } from "../shared/types";
 
 /** Mouse must travel this far (px) from the center before a slot is aimed at. */
 const DEAD_ZONE = 26;
@@ -114,8 +114,6 @@ export function WheelOverlay() {
 
   const visible = phase !== "hidden" && session;
   const fullscreen = session?.placement === "fullscreen";
-  const hint =
-    session?.activation === "toggle" ? "Click a slot or press 1–8\nEsc to close" : "Aim, then let go\nor press 1–8";
 
   return (
     <div
@@ -141,23 +139,23 @@ export function WheelOverlay() {
           key={openCount}
           className="overlay-wheel"
           style={{ left: session.x, top: session.y }}
-          initial={{ scale: 0.72, opacity: 0, rotate: -10 }}
+          initial={{ scale: 0.86, opacity: 0 }}
           animate={
             phase === "open"
-              ? { scale: 1, opacity: 1, rotate: 0 }
+              ? { scale: 1, opacity: 1 }
               : phase === "selecting"
                 ? { scale: 1.05, opacity: 0, transition: { duration: FLASH_MS / 1000, ease: "easeIn" } }
                 : { scale: 0.88, opacity: 0, transition: { duration: CANCEL_MS / 1000, ease: "easeIn" } }
           }
-          transition={{ type: "spring", stiffness: 480, damping: 30, mass: 0.8 }}
+          transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
         >
           <Wheel
             slots={session.slots}
-            radius={fullscreen ? 250 : 200}
+            radius={BASE_RADIUS[session.placement] * session.scale}
             hot={hot}
             flash={phase === "selecting" ? hot : null}
             aim={aim}
-            hint={hint}
+            idle={session.profileName}
           />
         </motion.div>
       )}

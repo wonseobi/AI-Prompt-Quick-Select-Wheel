@@ -13,7 +13,10 @@ type Events = {
   "wheel://open": OpenPayload;
   "wheel://release": null;
   "wheel://dismiss": null;
-  "config://changed": Config;
+  /** Config changed outside the settings window (e.g. profile picked from the menu bar). */
+  "config://external": Config;
+  /** A mouse button was pressed while recording a new hotkey, e.g. "Mouse4". */
+  "hotkey://mouse": string;
 };
 
 export function on<E extends keyof Events>(event: E, handler: (payload: Events[E]) => void): () => void {
@@ -42,6 +45,9 @@ export const api = {
   cancelWheel: () => call<void>("wheel_cancel"),
   inputPermission: () => call<boolean>("input_permission"),
   openPermissionSettings: () => call<void>("open_permission_settings"),
+  getAutostart: () => call<boolean>("get_autostart"),
+  setAutostart: (enabled: boolean) => call<boolean>("set_autostart", { enabled }),
+  openEmojiPalette: () => call<void>("open_emoji_palette"),
 
   async exportLoadout(name: string, description: string, slots: Slot[]): Promise<boolean> {
     const fileName = `${slugify(name) || "loadout"}.json`;

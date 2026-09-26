@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { isTauri } from "../shared/api";
 import { mock } from "../shared/mock";
+import { activeProfile } from "../shared/types";
 import "../styles/tokens.css";
 import "./overlay.css";
 import { WheelOverlay } from "./WheelOverlay";
@@ -25,7 +26,9 @@ if (!isTauri) {
     height: innerHeight,
     placement: (params.get("placement") ?? "cursor") as "cursor" | "fullscreen",
     activation: "hold" as const,
-    slots: mock.config.slots,
+    scale: mock.config.wheelScale,
+    profileName: activeProfile(mock.config).name,
+    slots: activeProfile(mock.config).slots,
   });
   addEventListener("mousemove", (e) => (mouse = { x: e.clientX, y: e.clientY }));
   addEventListener("keydown", (e) => {

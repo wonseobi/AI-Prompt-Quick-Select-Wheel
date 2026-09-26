@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { api } from "../shared/api";
-import { hotkeyParts, recordKey } from "../shared/hotkey";
+import { api, isTauri, on } from "../shared/api";
+import { hotkeyParts, mouseButtonHotkey, recordKey } from "../shared/hotkey";
 
 interface Props {
   value: string;
@@ -36,17 +36,29 @@ export function HotkeyRecorder({ value, onSave }: Props) {
 
   useEffect(() => {
     if (!recording) return;
-    const onKeyDown = async (e: KeyboardEvent) => {
+    const finish = async (accelerator: string) => {
+      setRecording(false);
+      setHeld([]);
+      setError(await onSave(accelerator));
+      api.pauseHotkey(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) return stop();
       const result = recordKey(e);
       if (result.kind === "pending") return setHeld(result.modifiers.map((m) => hotkeyParts(m)[0]));
       if (result.kind === "invalid") return setError(result.message);
-      setRecording(false);
-      setHeld([]);
-      setError(await onSave(result.accelerator));
-      api.pauseHotkey(false);
+      finish(result.accelerator);
+    };
+    // In the app, extra mouse buttons are caught system-wide by the backend.
+    // In a browser preview, fall back to the page's own mouse events.
+    const offMouse = on("hotkey://mouse", finish);
+    const onMouseDown = (e: MouseEvent) => {
+      const accelerator = mouseButtonHotkey(e.button);
+      if (isTauri || !accelerator) return;
+      e.preventDefault();
+      finish(accelerator);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const mods = [e.ctrlKey && "Control", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(Boolean) as string[];
@@ -54,9 +66,12 @@ export function HotkeyRecorder({ value, onSave }: Props) {
     };
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("mousedown", onMouseDown, true);
     return () => {
+      offMouse();
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("mousedown", onMouseDown, true);
     };
   }, [recording, onSave]);
 
@@ -79,7 +94,7 @@ export function HotkeyRecorder({ value, onSave }: Props) {
         <AnimatePresence mode="popLayout" initial={false}>
           {recording ? (
             <motion.span key="rec" className="recorder-inner" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-              {held.length ? <Keycaps parts={held} pending /> : <span className="recorder-prompt">Press your shortcut…</span>}
+              {held.length ? <Keycaps parts={held} pending /> : <span className="recorder-prompt">Press a key combo or mouse button…</span>}
               <span className="recorder-aside">Esc to cancel</span>
             </motion.span>
           ) : (

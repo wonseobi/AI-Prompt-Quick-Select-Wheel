@@ -25,7 +25,3 @@ body.wheel {
   position: absolute;
   translate: -50% -50%;
 }
-
-.wheel-hint {
-  white-space: pre-line;
-}

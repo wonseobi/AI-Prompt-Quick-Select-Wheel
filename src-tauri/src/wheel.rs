@@ -12,8 +12,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalPosition, Manager, Monitor, PhysicalPosition};
 
 pub const WHEEL_LABEL: &str = "wheel";
-/// Keep the wheel center this far (logical px) from screen edges in cursor mode.
-const EDGE_MARGIN: f64 = 250.0;
+/// Outer wheel radius (logical px) at 100% size. Keep in sync with WheelOverlay.tsx.
+const CURSOR_RADIUS: f64 = 200.0;
 
 #[derive(Default)]
 pub struct WheelState {
@@ -33,6 +33,8 @@ struct OpenPayload {
     height: f64,
     placement: Placement,
     activation: Activation,
+    scale: f64,
+    profile_name: String,
     slots: Vec<Slot>,
 }
 
@@ -67,11 +69,13 @@ pub fn open(app: &AppHandle) {
     let cursor_x = (cursor.x - origin.x as f64) / scale;
     let cursor_y = (cursor.y - origin.y as f64) / scale;
 
+    // Keep the whole wheel on screen in cursor mode.
+    let margin = CURSOR_RADIUS * cfg.wheel_scale + 30.0;
     let (x, y) = match cfg.placement {
         Placement::Fullscreen => (width / 2.0, height / 2.0),
         Placement::Cursor => (
-            cursor_x.clamp(EDGE_MARGIN.min(width / 2.0), (width - EDGE_MARGIN).max(width / 2.0)),
-            cursor_y.clamp(EDGE_MARGIN.min(height / 2.0), (height - EDGE_MARGIN).max(height / 2.0)),
+            cursor_x.clamp(margin.min(width / 2.0), (width - margin).max(width / 2.0)),
+            cursor_y.clamp(margin.min(height / 2.0), (height - margin).max(height / 2.0)),
         ),
     };
     // Aim is measured from the wheel center, so the cursor must start there.
@@ -87,10 +91,21 @@ pub fn open(app: &AppHandle) {
         return_to_settings,
     };
 
+    let profile = cfg.active();
     let _ = app.emit_to(
         WHEEL_LABEL,
         "wheel://open",
-        OpenPayload { x, y, width, height, placement: cfg.placement, activation: cfg.activation, slots: cfg.slots },
+        OpenPayload {
+            x,
+            y,
+            width,
+            height,
+            placement: cfg.placement,
+            activation: cfg.activation,
+            scale: cfg.wheel_scale,
+            profile_name: profile.name.clone(),
+            slots: profile.slots.clone(),
+        },
     );
     let _ = win.show();
     let _ = win.set_focus();
@@ -125,4 +140,21 @@ pub fn close(app: &AppHandle) {
 
 pub fn is_open(app: &AppHandle) -> bool {
     app.state::<AppState>().wheel.lock().unwrap().open
+}
+
+/// Lets the overlay appear on every Space, including over full-screen apps,
+/// and float above normal windows. Must run on the main thread.
+#[cfg(target_os = "macos")]
+pub fn float_over_fullscreen(win: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+    // NSWindowCollectionBehavior: CanJoinAllSpaces | Stationary | IgnoresCycle | FullScreenAuxiliary
+    const BEHAVIOR: usize = (1 << 0) | (1 << 4) | (1 << 6) | (1 << 8);
+    // Same level as pop-up menus: above full-screen app windows.
+    const LEVEL: isize = 101;
+    let Ok(ptr) = win.ns_window() else { return };
+    let ns_window = unsafe { &*(ptr as *const AnyObject) };
+    unsafe {
+        let _: () = msg_send![ns_window, setCollectionBehavior: BEHAVIOR];
+        let _: () = msg_send![ns_window, setLevel: LEVEL];
+    }
 }

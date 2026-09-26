@@ -15,12 +15,31 @@ const defaultSlots: Slot[] = [
 ];
 
 let config: Config = {
-  version: 1,
-  hotkey: "Alt+KeyQ",
+  version: 2,
+  hotkey: "Alt+KeyF",
   activation: "hold",
   placement: "cursor",
-  slots: defaultSlots,
+  wheelScale: 1,
+  profiles: [
+    { id: "default", name: "Coding", slots: defaultSlots },
+    {
+      id: "writing",
+      name: "Writing",
+      slots: [
+        { icon: "✍️", label: "Tighten", prompt: "Tighten this text. Cut filler, keep the meaning." },
+        { icon: "🎩", label: "Formal", prompt: "Rewrite this in a formal tone." },
+        { icon: "😊", label: "Friendly", prompt: "Rewrite this in a warm, friendly tone." },
+        { icon: "📌", label: "Summarize", prompt: "Summarize this in three bullet points." },
+        { icon: "", label: "", prompt: "" },
+        { icon: "", label: "", prompt: "" },
+        { icon: "", label: "", prompt: "" },
+        { icon: "", label: "", prompt: "" },
+      ],
+    },
+  ],
+  activeProfile: "default",
 };
+let autostart = false;
 
 const bus = new EventTarget();
 
@@ -47,8 +66,12 @@ export const mock = {
         config = structuredClone(args.config as Config);
         return structuredClone(config);
       case "wheel_select":
-        console.info("[mock] paste slot", args.index, config.slots[args.index as number]?.prompt);
+        console.info("[mock] paste slot", args.index);
         return;
+      case "get_autostart":
+        return autostart;
+      case "set_autostart":
+        return (autostart = Boolean(args.enabled));
       case "input_permission":
         return true;
       default:

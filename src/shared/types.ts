@@ -9,12 +9,23 @@ export interface Slot {
   prompt: string;
 }
 
+/** A named set of 8 slots; switching profiles swaps the whole wheel. */
+export interface Profile {
+  id: string;
+  name: string;
+  slots: Slot[];
+}
+
 export interface Config {
   version: number;
+  /** "Alt+KeyF"-style key combo, or a mouse button like "Mouse4". */
   hotkey: string;
   activation: Activation;
   placement: Placement;
-  slots: Slot[];
+  /** Wheel size multiplier, 0.7–1.4. */
+  wheelScale: number;
+  profiles: Profile[];
+  activeProfile: string;
 }
 
 export interface Loadout {
@@ -33,9 +44,22 @@ export interface OpenPayload {
   height: number;
   placement: Placement;
   activation: Activation;
+  scale: number;
+  profileName: string;
   slots: Slot[];
 }
 
 export const SLOT_COUNT = 8;
+export const MIN_SCALE = 0.7;
+export const MAX_SCALE = 1.4;
+/** Outer wheel radius at 100% size. Keep in sync with wheel.rs. */
+export const BASE_RADIUS = { cursor: 200, fullscreen: 250 } as const;
+
+export const activeProfile = (config: Config) =>
+  config.profiles.find((p) => p.id === config.activeProfile) ?? config.profiles[0];
+
+export const emptySlots = (): Slot[] => Array.from({ length: SLOT_COUNT }, () => ({ label: "", icon: "", prompt: "" }));
+
+export const newProfileId = () => `p-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export const isEmpty = (slot?: Slot) => !slot || !slot.prompt.trim();
