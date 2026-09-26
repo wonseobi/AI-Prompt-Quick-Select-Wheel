@@ -1,0 +1,196 @@
+.wheel {
+  position: relative;
+  flex: none;
+}
+
+.wheel-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.wheel-halo {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 24;
+  filter: blur(14px);
+}
+
+/* ----- segments ----- */
+
+.wheel-seg path {
+  fill: var(--seg);
+  stroke: var(--seg-edge);
+  stroke-width: 1;
+  transition: fill 0.14s var(--ease-out), stroke 0.14s var(--ease-out), filter 0.2s var(--ease-out);
+}
+
+.wheel-seg.is-empty path {
+  fill: var(--seg-empty);
+  stroke-dasharray: 4 4;
+}
+
+.wheel-seg.is-hot path {
+  fill: url(#seg-hot);
+  stroke: rgba(255, 255, 255, 0.55);
+  filter: drop-shadow(0 0 14px rgba(143, 208, 255, 0.55));
+}
+
+.wheel-seg.is-hot.is-empty path {
+  fill: rgba(143, 208, 255, 0.22);
+  stroke: var(--accent);
+}
+
+.wheel-seg.is-selected:not(.is-hot) path {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.wheel-seg.is-flash path {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 22px rgba(255, 255, 255, 0.9));
+  transition: none;
+}
+
+.wheel-key {
+  font: 600 10px var(--font);
+  fill: var(--text-faint);
+  pointer-events: none;
+  transition: fill 0.14s;
+}
+
+.wheel-seg.is-hot .wheel-key {
+  fill: rgba(6, 18, 31, 0.7);
+}
+
+/* settings preview: segments are clickable */
+.wheel.is-interactive .wheel-seg {
+  cursor: pointer;
+}
+
+/* ----- slot content ----- */
+
+.wheel-item {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.wheel-icon {
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+.wheel-item.is-empty .wheel-icon {
+  color: var(--text-faint);
+  filter: none;
+  font-weight: 300;
+}
+
+.wheel-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: color 0.14s;
+}
+
+.wheel-item.is-empty .wheel-label {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.wheel-item.is-hot .wheel-label {
+  color: var(--accent-ink);
+  text-shadow: none;
+}
+
+/* ----- center ----- */
+
+.wheel-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(34, 39, 48, 0.95), var(--center) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.wheel-center-text {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 78%;
+  text-align: center;
+}
+
+.wheel-center-text strong {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.wheel-count {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.wheel-count kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wheel-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.wheel-pointer {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+.wheel-pointer span {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 0;
+  height: 0;
+  translate: -50% 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 9px solid var(--accent);
+  filter: drop-shadow(0 0 6px rgba(143, 208, 255, 0.8));
+}

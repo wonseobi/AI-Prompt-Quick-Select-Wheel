@@ -1,0 +1,67 @@
+:root {
+  color-scheme: dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+
+  /* surfaces */
+  --bg: #0f1115;
+  --bg-raised: #171a20;
+  --bg-card: #1b1f26;
+  --bg-input: #12151a;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* text */
+  --text: #eef1f6;
+  --text-dim: #9aa3b2;
+  --text-faint: #646c7a;
+
+  /* accent: cool sky blue, echoes the highlighted wheel slot */
+  --accent: #8fd0ff;
+  --accent-strong: #5cb8ff;
+  --accent-ink: #06121f;
+  --accent-soft: rgba(143, 208, 255, 0.14);
+
+  --warn: #ffc56b;
+  --warn-soft: rgba(255, 197, 107, 0.12);
+  --danger: #ff7a7a;
+  --ok: #7ee2a8;
+
+  /* wheel */
+  --seg: rgba(24, 27, 33, 0.86);
+  --seg-edge: rgba(255, 255, 255, 0.07);
+  --seg-empty: rgba(24, 27, 33, 0.6);
+  --hot-inner: #cfeaff;
+  --hot-outer: #8fd0ff;
+  --center: rgba(12, 14, 18, 0.92);
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+kbd {
+  font-family: var(--font);
+}

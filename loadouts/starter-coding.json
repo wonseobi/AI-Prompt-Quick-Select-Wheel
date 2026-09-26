@@ -1,0 +1,48 @@
+{
+  "type": "prompt-wheel-loadout",
+  "version": 1,
+  "name": "Starter: coding",
+  "description": "The default wheel: everyday prompts for coding with AI.",
+  "slots": [
+    {
+      "label": "Code review",
+      "icon": "🔍",
+      "prompt": "Review this code for bugs, edge cases and readability. List issues from most to least severe, each with a suggested fix."
+    },
+    {
+      "label": "Debug",
+      "icon": "🐛",
+      "prompt": "Here is an error. Explain the root cause in plain terms, then give the smallest change that fixes it."
+    },
+    {
+      "label": "Write tests",
+      "icon": "🧪",
+      "prompt": "Write focused tests for this code. Cover the happy path, edge cases and one failure case. Match the existing test style."
+    },
+    {
+      "label": "Simplify",
+      "icon": "✂️",
+      "prompt": "Simplify this code without changing its behavior. Remove duplication and dead code, and keep names clear."
+    },
+    {
+      "label": "Plan first",
+      "icon": "🧭",
+      "prompt": "Before writing any code, outline your plan: the files you will touch, the approach, and any open questions for me."
+    },
+    {
+      "label": "Explain",
+      "icon": "📖",
+      "prompt": "Explain what this code does as if I'm new to the codebase. Start with the big picture, then walk through the key parts."
+    },
+    {
+      "label": "Commit msg",
+      "icon": "💬",
+      "prompt": "Write a concise git commit message for these changes: a short summary line, then a few bullet points."
+    },
+    {
+      "label": "Be concise",
+      "icon": "🎯",
+      "prompt": "Keep your answer short and direct. Lead with the result, skip the preamble."
+    }
+  ]
+}

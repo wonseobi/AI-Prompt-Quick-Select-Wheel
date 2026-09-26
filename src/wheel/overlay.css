@@ -1,0 +1,31 @@
+html,
+body.wheel {
+  background: transparent;
+  overflow: hidden;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+}
+
+.overlay.hide-cursor {
+  cursor: none;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(10, 14, 20, 0.25), rgba(4, 6, 10, 0.7) 75%),
+    rgba(4, 6, 10, 0.25);
+}
+
+.overlay-wheel {
+  position: absolute;
+  translate: -50% -50%;
+}
+
+.wheel-hint {
+  white-space: pre-line;
+}

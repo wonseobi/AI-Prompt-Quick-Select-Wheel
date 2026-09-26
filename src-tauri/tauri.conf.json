@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Prompt Wheel",
+  "version": "0.1.0",
+  "identifier": "com.wonseobi.promptwheel",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "wheel",
+        "title": "Prompt Wheel",
+        "url": "wheel.html",
+        "width": 600,
+        "height": 600,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true,
+        "acceptFirstMouse": true
+      },
+      {
+        "label": "settings",
+        "title": "Prompt Wheel Settings",
+        "url": "settings.html",
+        "width": 1080,
+        "height": 720,
+        "minWidth": 900,
+        "minHeight": 620,
+        "visible": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "A weapon wheel for your AI prompts",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
