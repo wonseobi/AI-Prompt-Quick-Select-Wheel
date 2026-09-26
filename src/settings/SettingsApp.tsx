@@ -189,7 +189,7 @@ export function SettingsApp() {
                 <strong>One more step to paste into other apps</strong>
                 <p>
                   Turn on <b>Prompt Wheel</b> in System Settings → Privacy & Security → Accessibility. This lets it press
-                  ⌘V for you.
+                  ⌘V for you. Already on? Select it, remove it with <b>−</b>, then reopen Prompt Wheel and allow it again.
                 </p>
               </div>
               <button className="btn primary" onClick={() => api.openPermissionSettings()}>
