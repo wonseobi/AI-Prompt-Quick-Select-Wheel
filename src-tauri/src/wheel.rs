@@ -9,24 +9,22 @@ use crate::{
     AppState,
 };
 use serde::Serialize;
-use std::{thread, time::Duration};
 use tauri::{AppHandle, Emitter, LogicalPosition, Manager, Monitor, PhysicalPosition, WebviewWindow};
 
 pub const WHEEL_LABEL: &str = "wheel";
 /// Outer wheel radius (logical px) at 100% size. Keep in sync with WheelOverlay.tsx.
 const CURSOR_RADIUS: f64 = 200.0;
-/// How long the "switched profile" popup stays up. Keep in sync with WheelOverlay.tsx.
-const HUD_DURATION: Duration = Duration::from_millis(1100);
 
 #[derive(Default)]
 pub struct WheelState {
+    /// The overlay is up and has focus (wheel or profile picker).
     pub open: bool,
+    /// The overlay is showing the profile picker rather than the wheel.
+    pub picker: bool,
     /// Cursor position to restore on close, if we had to move it.
     restore_cursor: Option<LogicalPosition<f64>>,
     /// The settings window had focus when the wheel opened, so return there.
     return_to_settings: bool,
-    /// Bumped on every popup/open so a stale popup timer doesn't hide the window.
-    hud_generation: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -80,6 +78,11 @@ fn cover_monitor(app: &AppHandle, win: &WebviewWindow) -> Option<Cover> {
     })
 }
 
+fn settings_focused(app: &AppHandle) -> bool {
+    app.get_webview_window(crate::SETTINGS_LABEL)
+        .is_some_and(|w| w.is_focused().unwrap_or(false))
+}
+
 pub fn open(app: &AppHandle) {
     let state = app.state::<AppState>();
     let cfg = state.config.lock().unwrap().clone();
@@ -98,17 +101,12 @@ pub fn open(app: &AppHandle) {
     // Aim is measured from the wheel center, so the cursor must start there.
     let moved = (x - cursor_x).abs() > 1.0 || (y - cursor_y).abs() > 1.0;
 
-    let return_to_settings = app
-        .get_webview_window(crate::SETTINGS_LABEL)
-        .is_some_and(|w| w.is_focused().unwrap_or(false));
-
-    {
-        let mut wheel = state.wheel.lock().unwrap();
-        wheel.open = true;
-        wheel.restore_cursor = moved.then(|| LogicalPosition::new(cursor_x, cursor_y));
-        wheel.return_to_settings = return_to_settings;
-        wheel.hud_generation += 1;
-    }
+    *state.wheel.lock().unwrap() = WheelState {
+        open: true,
+        picker: false,
+        restore_cursor: moved.then(|| LogicalPosition::new(cursor_x, cursor_y)),
+        return_to_settings: settings_focused(app),
+    };
 
     let profile = cfg.active();
     let _ = app.emit_to(
@@ -126,7 +124,6 @@ pub fn open(app: &AppHandle) {
             slots: profile.slots.clone(),
         },
     );
-    let _ = win.set_ignore_cursor_events(false);
     let _ = win.show();
     let _ = win.set_focus();
     if moved {
@@ -158,8 +155,11 @@ pub fn close(app: &AppHandle) {
     }
 }
 
-pub fn is_open(app: &AppHandle) -> bool {
-    app.state::<AppState>().wheel.lock().unwrap().open
+/// (overlay open, showing the profile picker)
+pub fn mode(app: &AppHandle) -> (bool, bool) {
+    let state = app.state::<AppState>();
+    let wheel = state.wheel.lock().unwrap();
+    (wheel.open, wheel.picker)
 }
 
 #[derive(Clone, Serialize)]
@@ -171,44 +171,63 @@ struct ProfilePayload {
     slots: Vec<Slot>,
 }
 
-/// The active profile changed from the "next profile" shortcut. With the wheel
-/// open it swaps slots in place; otherwise a small popup names the new
-/// profile next to the cursor without taking focus from the current app.
+/// "Next profile" while the wheel is open: swap its slots in place.
 pub fn profile_switched(app: &AppHandle, name: String, index: usize, total: usize, slots: Vec<Slot>) {
-    let payload = ProfilePayload { profile_name: name, index, total, slots };
-    if is_open(app) {
-        let _ = app.emit_to(WHEEL_LABEL, "wheel://profile", payload);
-        return;
-    }
+    let _ = app.emit_to(WHEEL_LABEL, "wheel://profile", ProfilePayload { profile_name: name, index, total, slots });
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PickerProfile {
+    id: String,
+    name: String,
+    /// One icon per slot, "" for empty slots: a tiny preview of the wheel.
+    icons: Vec<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PickerPayload {
+    x: f64,
+    y: f64,
+    active_profile: String,
+    profiles: Vec<PickerProfile>,
+}
+
+/// Opens the profile picker next to the cursor.
+pub fn open_picker(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let cfg = state.config.lock().unwrap().clone();
     let Some(win) = app.get_webview_window(WHEEL_LABEL) else { return };
     let Some(cover) = cover_monitor(app, &win) else { return };
-    let state = app.state::<AppState>();
-    let generation = {
-        let mut wheel = state.wheel.lock().unwrap();
-        wheel.hud_generation += 1;
-        wheel.hud_generation
-    };
-    #[derive(Clone, Serialize)]
-    struct HudPayload {
-        x: f64,
-        y: f64,
-        #[serde(flatten)]
-        profile: ProfilePayload,
-    }
-    let _ = app.emit_to(WHEEL_LABEL, "wheel://hud", HudPayload { x: cover.cursor_x, y: cover.cursor_y, profile: payload });
-    // Clicks pass straight through to the app underneath while the popup shows.
-    let _ = win.set_ignore_cursor_events(true);
-    let _ = win.show();
 
-    let app = app.clone();
-    thread::spawn(move || {
-        thread::sleep(HUD_DURATION);
-        let state = app.state::<AppState>();
-        let wheel = state.wheel.lock().unwrap();
-        if !wheel.open && wheel.hud_generation == generation {
-            let _ = win.hide();
-        }
-    });
+    *state.wheel.lock().unwrap() = WheelState {
+        open: true,
+        picker: true,
+        restore_cursor: None,
+        return_to_settings: settings_focused(app),
+    };
+
+    let profiles = cfg
+        .profiles
+        .iter()
+        .map(|p| PickerProfile {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            icons: p
+                .slots
+                .iter()
+                .map(|s| if s.prompt.trim().is_empty() { String::new() } else if s.icon.is_empty() { "💬".into() } else { s.icon.clone() })
+                .collect(),
+        })
+        .collect();
+    let _ = app.emit_to(
+        WHEEL_LABEL,
+        "picker://open",
+        PickerPayload { x: cover.cursor_x, y: cover.cursor_y, active_profile: cfg.active_profile.clone(), profiles },
+    );
+    let _ = win.show();
+    let _ = win.set_focus();
 }
 
 /// Lets the overlay appear on every Space, including over full-screen apps,

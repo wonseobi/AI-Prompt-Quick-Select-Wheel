@@ -45,35 +45,6 @@ body.wheel {
   font: 650 13px var(--font);
 }
 
-/* "switched profile" popup next to the cursor while the wheel is closed */
-.hud {
-  position: absolute;
-  translate: -50% 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 16px 9px 12px;
-  border-radius: 999px;
-  white-space: nowrap;
-  background: rgba(14, 16, 20, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-}
-
-.hud-name {
-  font: 650 14px var(--font-display);
-  color: var(--text);
-}
-
-.hud-icon rect {
-  fill: rgba(255, 255, 255, 0.3);
-}
-
-.hud-icon .hot {
-  fill: var(--accent);
-}
-
 .profile-dots {
   display: inline-flex;
   gap: 4px;
@@ -90,4 +61,125 @@ body.wheel {
 .profile-dots span.is-on {
   background: var(--accent);
   transform: scale(1.3);
+}
+
+/* ---------- profile picker ---------- */
+
+.picker-layer {
+  position: fixed;
+  inset: 0;
+}
+
+.picker {
+  position: absolute;
+  padding: 0 6px 6px;
+  border-radius: 16px;
+  background: rgba(18, 21, 26, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  font: 600 11px var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.picker-keys {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.picker-row.is-hover {
+  background: rgba(143, 208, 255, 0.14);
+}
+
+.picker-row.is-chosen {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.picker-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  font: 700 11px var(--font);
+  color: var(--text-dim);
+}
+
+.picker-row.is-chosen .picker-num {
+  background: rgba(6, 18, 31, 0.15);
+  color: var(--accent-ink);
+}
+
+.picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 14px var(--font-display);
+}
+
+.picker-row.is-active .picker-name {
+  color: var(--accent);
+}
+
+.picker-row.is-chosen .picker-name {
+  color: var(--accent-ink);
+}
+
+.picker-icons {
+  flex: none;
+  display: flex;
+  gap: 1px;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.picker-icons span {
+  width: 13px;
+  text-align: center;
+}
+
+.picker-icons .is-empty {
+  color: var(--text-faint);
+}
+
+.picker-check {
+  flex: none;
+  width: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.picker-row.is-chosen .picker-check {
+  color: var(--accent-ink);
 }

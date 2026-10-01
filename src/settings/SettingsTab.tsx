@@ -29,7 +29,7 @@ export function SettingsTab({ config, onChange, onHotkey }: Props) {
           </div>
           <div className="shortcut-row">
             <span className="field-label">
-              Next profile <span className="muted">· tap it while the wheel is open to flip profiles</span>
+              Switch profile <span className="muted">· opens a profile picker; with the wheel open, flips to the next profile</span>
             </span>
             <HotkeyRecorder
               value={config.profileHotkey}

@@ -4,7 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import type { Config, HudPayload, Loadout, OpenPayload, ProfileSwitch, Slot } from "./types";
+import type { Config, Loadout, OpenPayload, PickerPayload, ProfileSwitch, Slot } from "./types";
 import { mock } from "./mock";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
@@ -15,8 +15,12 @@ type Events = {
   "wheel://dismiss": null;
   /** Profile switched while the wheel is open: swap its slots in place. */
   "wheel://profile": ProfileSwitch;
-  /** Profile switched while the wheel is closed: show a small popup. */
-  "wheel://hud": HudPayload;
+  /** Profile shortcut pressed with the wheel closed: show the profile picker. */
+  "picker://open": PickerPayload;
+  /** Profile shortcut let go: pick the profile under the mouse, if any. */
+  "picker://release": null;
+  /** Profile shortcut pressed again: close the picker. */
+  "picker://dismiss": null;
   /** Config changed outside the settings window (e.g. profile picked from the menu bar). */
   "config://external": Config;
   /** A mouse button was pressed while recording a new hotkey, e.g. "Mouse4". */
@@ -47,6 +51,7 @@ export const api = {
   pauseHotkey: (paused: boolean) => call<void>("pause_hotkey", { paused }),
   selectSlot: (index: number) => call<void>("wheel_select", { index }),
   cancelWheel: () => call<void>("wheel_cancel"),
+  chooseProfile: (id: string) => call<void>("choose_profile", { id }),
   inputPermission: () => call<boolean>("input_permission"),
   openPermissionSettings: () => call<void>("open_permission_settings"),
   getAutostart: () => call<boolean>("get_autostart"),

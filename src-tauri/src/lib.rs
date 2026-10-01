@@ -27,7 +27,10 @@ pub struct AppState {
 /// The hotkey (key combo or mouse button) went down or up.
 pub fn on_trigger(app: &AppHandle, pressed: bool) {
     let activation = app.state::<AppState>().config.lock().unwrap().activation;
-    let open = wheel::is_open(app);
+    let (open, picker) = wheel::mode(app);
+    if picker {
+        return; // the profile picker is up; finish with it first
+    }
     match (pressed, open) {
         (true, false) => wheel::open(app),
         // Second press in toggle mode closes; key repeat in hold mode is ignored.
@@ -60,11 +63,7 @@ fn register_hotkeys(app: &AppHandle, wheel: &str, profile: &str) -> Result<(), S
     }
     if profile_button.is_none() && !profile.trim().is_empty() {
         shortcuts
-            .on_shortcut(profile, |app, _, event| {
-                if event.state == ShortcutState::Pressed {
-                    next_profile(app);
-                }
-            })
+            .on_shortcut(profile, |app, _, event| on_profile_trigger(app, event.state == ShortcutState::Pressed))
             .map_err(|e| format!("That profile shortcut can't be used ({e}). Try another combination."))?;
     }
     mouse::set_bindings(wheel_button, profile_button);
@@ -80,8 +79,26 @@ fn register_from_config(app: &AppHandle) -> Result<(), String> {
     register_hotkeys(app, &wheel, &profile)
 }
 
-/// Cycles to the next profile (wrapping around) from the profile hotkey.
-pub fn next_profile(app: &AppHandle) {
+/// The profile hotkey went down or up. With the wheel closed it opens the
+/// profile picker (hold, point, release; or tap and click). With the wheel
+/// open it flips straight to the next profile so aiming isn't interrupted.
+pub fn on_profile_trigger(app: &AppHandle, pressed: bool) {
+    let (open, picker) = wheel::mode(app);
+    match (pressed, open, picker) {
+        (true, false, _) => wheel::open_picker(app),
+        (true, true, false) => next_profile(app),
+        (true, true, true) => {
+            let _ = app.emit_to(wheel::WHEEL_LABEL, "picker://dismiss", ());
+        }
+        (false, true, true) => {
+            let _ = app.emit_to(wheel::WHEEL_LABEL, "picker://release", ());
+        }
+        _ => {}
+    }
+}
+
+/// Cycles to the next profile (wrapping around) while the wheel is open.
+fn next_profile(app: &AppHandle) {
     let state = app.state::<AppState>();
     let cfg = {
         let mut cfg = state.config.lock().unwrap();
@@ -227,6 +244,13 @@ fn wheel_select(app: AppHandle, state: tauri::State<AppState>, index: usize) {
     }
 }
 
+/// A profile was picked in the profile picker.
+#[tauri::command]
+fn choose_profile(app: AppHandle, id: String) {
+    switch_profile(&app, &id);
+    wheel::close(&app);
+}
+
 #[tauri::command]
 fn wheel_cancel(app: AppHandle) {
     wheel::close(&app);
@@ -307,6 +331,7 @@ pub fn run() {
             pause_hotkey,
             wheel_select,
             wheel_cancel,
+            choose_profile,
             export_loadout,
             import_loadout,
             input_permission,

@@ -91,7 +91,7 @@ export function SettingsApp() {
       if (!configRef.current) return null;
       const other = field === "hotkey" ? configRef.current.profileHotkey : configRef.current.hotkey;
       if (accelerator && accelerator === other) {
-        return field === "hotkey" ? "That's your next-profile shortcut. Pick another one." : "That already opens the wheel. Pick another one.";
+        return field === "hotkey" ? "That's your switch-profile shortcut. Pick another one." : "That already opens the wheel. Pick another one.";
       }
       clearTimeout(saveTimer.current);
       try {

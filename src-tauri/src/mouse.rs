@@ -139,9 +139,7 @@ mod mac {
         if button == WHEEL_BUTTON.load(Ordering::Relaxed) {
             let _ = app.run_on_main_thread(move || crate::on_trigger(&handle, pressed));
         } else if button == PROFILE_BUTTON.load(Ordering::Relaxed) {
-            if pressed {
-                let _ = app.run_on_main_thread(move || crate::next_profile(&handle));
-            }
+            let _ = app.run_on_main_thread(move || crate::on_profile_trigger(&handle, pressed));
         } else {
             return CallbackResult::Keep;
         }

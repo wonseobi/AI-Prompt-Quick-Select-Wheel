@@ -7,7 +7,7 @@ Each prompt lives in a fixed direction, so after a few days you pick them by mus
 - **Hold & release** (default): hold the shortcut, aim, let go to paste. Or press `1`–`8`.
 - **Press to toggle**: press once to open, click or press `1`–`8`, press again to close.
 - **Any key combo or mouse button**: bind middle click or your mouse's thumb buttons (macOS).
-- **Profiles**: keep several wheels (Coding, Writing, …), drag to reorder, and flip through them with **⌥ D**, even while the wheel is open.
+- **Profiles**: keep several wheels (Coding, Writing, …) and drag to reorder them. **⌥ D** opens a profile picker at the cursor; with the wheel open it flips to the next profile.
 - **Opens at the cursor** (default) or **full screen** with the background dimmed, even over full-screen apps.
 - **Adjustable size**, 70–140%.
 - **Clipboard-safe**: your clipboard is put back right after pasting.
@@ -27,7 +27,7 @@ npm run tauri build    # build the .app / .dmg into src-tauri/target/release/bun
 
 On first launch, macOS asks for **Accessibility** access (System Settings → Privacy & Security → Accessibility). Prompt Wheel needs it to press ⌘V for you. The app lives in the menu bar; click its icon to open Settings.
 
-Default shortcuts: **⌥ F** opens the wheel, **⌥ D** switches to the next profile. Change either in the Settings tab.
+Default shortcuts: **⌥ F** opens the wheel, **⌥ D** switches profile. Change either in the Settings tab.
 
 ## Loadouts
 

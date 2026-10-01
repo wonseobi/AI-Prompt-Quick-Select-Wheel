@@ -51,7 +51,7 @@ export interface OpenPayload {
   slots: Slot[];
 }
 
-/** Sent when the "next profile" shortcut switches profiles. */
+/** Sent when the profile shortcut flips profiles while the wheel is open. */
 export interface ProfileSwitch {
   profileName: string;
   index: number;
@@ -59,10 +59,13 @@ export interface ProfileSwitch {
   slots: Slot[];
 }
 
-/** Profile switched while the wheel was closed: a popup near the cursor. */
-export interface HudPayload extends ProfileSwitch {
+/** Opens the profile picker next to the cursor (logical px). */
+export interface PickerPayload {
   x: number;
   y: number;
+  activeProfile: string;
+  /** `icons` has one entry per slot, "" for empty slots. */
+  profiles: { id: string; name: string; icons: string[] }[];
 }
 
 export const SLOT_COUNT = 8;
