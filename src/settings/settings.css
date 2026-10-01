@@ -980,11 +980,33 @@ p {
 }
 
 .profile-pills {
-  flex: 1;
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
   min-width: 0;
+}
+
+.profile-item {
+  position: relative;
+  border-radius: 9px;
+  cursor: grab;
+}
+
+.profile-item.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.profile-item.is-dragging .profile-pill:not(.is-on) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.profile-item .profile-pill {
+  cursor: inherit;
+}
+
+.profile-add {
+  flex: 1;
 }
 
 .profile-pill {
@@ -1248,4 +1270,39 @@ p {
 
 .slider:active::-webkit-slider-thumb {
   transform: scale(1.15);
+}
+
+/* ---------- shortcuts ---------- */
+
+.shortcut-row + .shortcut-row {
+  margin-top: 14px;
+}
+
+.shortcut-row > .field-label {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.shortcut-row .field-label .muted {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.recorder-row {
+  display: flex;
+  gap: 8px;
+}
+
+.recorder-row .recorder-field {
+  flex: 1;
+}
+
+.recorder-clear {
+  height: 52px;
+  border-radius: 12px;
+}
+
+.recorder-off {
+  font-size: 13px;
+  color: var(--text-faint);
 }

@@ -9,11 +9,14 @@ use crate::{
     AppState,
 };
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, LogicalPosition, Manager, Monitor, PhysicalPosition};
+use std::{thread, time::Duration};
+use tauri::{AppHandle, Emitter, LogicalPosition, Manager, Monitor, PhysicalPosition, WebviewWindow};
 
 pub const WHEEL_LABEL: &str = "wheel";
 /// Outer wheel radius (logical px) at 100% size. Keep in sync with WheelOverlay.tsx.
 const CURSOR_RADIUS: f64 = 200.0;
+/// How long the "switched profile" popup stays up. Keep in sync with WheelOverlay.tsx.
+const HUD_DURATION: Duration = Duration::from_millis(1100);
 
 #[derive(Default)]
 pub struct WheelState {
@@ -22,6 +25,8 @@ pub struct WheelState {
     restore_cursor: Option<LogicalPosition<f64>>,
     /// The settings window had focus when the wheel opened, so return there.
     return_to_settings: bool,
+    /// Bumped on every popup/open so a stale popup timer doesn't hide the window.
+    hud_generation: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -52,22 +57,34 @@ fn monitor_under(app: &AppHandle, point: PhysicalPosition<f64>) -> Option<Monito
         .or_else(|| app.primary_monitor().ok().flatten())
 }
 
-pub fn open(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let cfg = state.config.lock().unwrap().clone();
-    let Some(win) = app.get_webview_window(WHEEL_LABEL) else { return };
-    let cursor = app.cursor_position().unwrap_or_default();
-    let Some(monitor) = monitor_under(app, cursor) else { return };
+/// The overlay stretched over the monitor under the cursor, in logical px.
+struct Cover {
+    width: f64,
+    height: f64,
+    cursor_x: f64,
+    cursor_y: f64,
+}
 
+fn cover_monitor(app: &AppHandle, win: &WebviewWindow) -> Option<Cover> {
+    let cursor = app.cursor_position().unwrap_or_default();
+    let monitor = monitor_under(app, cursor)?;
     let scale = monitor.scale_factor();
     let _ = win.set_position(*monitor.position());
     let _ = win.set_size(*monitor.size());
     let origin = win.outer_position().unwrap_or(*monitor.position());
+    Some(Cover {
+        width: monitor.size().width as f64 / scale,
+        height: monitor.size().height as f64 / scale,
+        cursor_x: (cursor.x - origin.x as f64) / scale,
+        cursor_y: (cursor.y - origin.y as f64) / scale,
+    })
+}
 
-    let width = monitor.size().width as f64 / scale;
-    let height = monitor.size().height as f64 / scale;
-    let cursor_x = (cursor.x - origin.x as f64) / scale;
-    let cursor_y = (cursor.y - origin.y as f64) / scale;
+pub fn open(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let cfg = state.config.lock().unwrap().clone();
+    let Some(win) = app.get_webview_window(WHEEL_LABEL) else { return };
+    let Some(Cover { width, height, cursor_x, cursor_y }) = cover_monitor(app, &win) else { return };
 
     // Keep the whole wheel on screen in cursor mode.
     let margin = CURSOR_RADIUS * cfg.wheel_scale + 30.0;
@@ -85,11 +102,13 @@ pub fn open(app: &AppHandle) {
         .get_webview_window(crate::SETTINGS_LABEL)
         .is_some_and(|w| w.is_focused().unwrap_or(false));
 
-    *state.wheel.lock().unwrap() = WheelState {
-        open: true,
-        restore_cursor: moved.then(|| LogicalPosition::new(cursor_x, cursor_y)),
-        return_to_settings,
-    };
+    {
+        let mut wheel = state.wheel.lock().unwrap();
+        wheel.open = true;
+        wheel.restore_cursor = moved.then(|| LogicalPosition::new(cursor_x, cursor_y));
+        wheel.return_to_settings = return_to_settings;
+        wheel.hud_generation += 1;
+    }
 
     let profile = cfg.active();
     let _ = app.emit_to(
@@ -107,6 +126,7 @@ pub fn open(app: &AppHandle) {
             slots: profile.slots.clone(),
         },
     );
+    let _ = win.set_ignore_cursor_events(false);
     let _ = win.show();
     let _ = win.set_focus();
     if moved {
@@ -140,6 +160,55 @@ pub fn close(app: &AppHandle) {
 
 pub fn is_open(app: &AppHandle) -> bool {
     app.state::<AppState>().wheel.lock().unwrap().open
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProfilePayload {
+    profile_name: String,
+    index: usize,
+    total: usize,
+    slots: Vec<Slot>,
+}
+
+/// The active profile changed from the "next profile" shortcut. With the wheel
+/// open it swaps slots in place; otherwise a small popup names the new
+/// profile next to the cursor without taking focus from the current app.
+pub fn profile_switched(app: &AppHandle, name: String, index: usize, total: usize, slots: Vec<Slot>) {
+    let payload = ProfilePayload { profile_name: name, index, total, slots };
+    if is_open(app) {
+        let _ = app.emit_to(WHEEL_LABEL, "wheel://profile", payload);
+        return;
+    }
+    let Some(win) = app.get_webview_window(WHEEL_LABEL) else { return };
+    let Some(cover) = cover_monitor(app, &win) else { return };
+    let state = app.state::<AppState>();
+    let generation = {
+        let mut wheel = state.wheel.lock().unwrap();
+        wheel.hud_generation += 1;
+        wheel.hud_generation
+    };
+    #[derive(Clone, Serialize)]
+    struct HudPayload {
+        x: f64,
+        y: f64,
+        #[serde(flatten)]
+        profile: ProfilePayload,
+    }
+    let _ = app.emit_to(WHEEL_LABEL, "wheel://hud", HudPayload { x: cover.cursor_x, y: cover.cursor_y, profile: payload });
+    // Clicks pass straight through to the app underneath while the popup shows.
+    let _ = win.set_ignore_cursor_events(true);
+    let _ = win.show();
+
+    let app = app.clone();
+    thread::spawn(move || {
+        thread::sleep(HUD_DURATION);
+        let state = app.state::<AppState>();
+        let wheel = state.wheel.lock().unwrap();
+        if !wheel.open && wheel.hud_generation == generation {
+            let _ = win.hide();
+        }
+    });
 }
 
 /// Lets the overlay appear on every Space, including over full-screen apps,

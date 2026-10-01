@@ -7,6 +7,8 @@ interface Props {
   value: string;
   /** Saves the new hotkey; resolves to an error message if it was rejected. */
   onSave: (accelerator: string) => Promise<string | null>;
+  /** If given, the shortcut can be turned off (saved as ""). */
+  onClear?: () => Promise<string | null>;
 }
 
 export function Keycaps({ parts, pending = false }: { parts: string[]; pending?: boolean }) {
@@ -22,7 +24,7 @@ export function Keycaps({ parts, pending = false }: { parts: string[]; pending?:
   );
 }
 
-export function HotkeyRecorder({ value, onSave }: Props) {
+export function HotkeyRecorder({ value, onSave, onClear }: Props) {
   const [recording, setRecording] = useState(false);
   const [held, setHeld] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -83,28 +85,35 @@ export function HotkeyRecorder({ value, onSave }: Props) {
 
   return (
     <div className="recorder">
-      <motion.button
-        ref={buttonRef}
-        type="button"
-        className={`recorder-field${recording ? " is-recording" : ""}`}
-        onClick={recording ? stop : start}
-        onBlur={() => recording && stop()}
-        whileTap={{ scale: 0.98 }}
-      >
-        <AnimatePresence mode="popLayout" initial={false}>
-          {recording ? (
-            <motion.span key="rec" className="recorder-inner" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-              {held.length ? <Keycaps parts={held} pending /> : <span className="recorder-prompt">Press a key combo or mouse button…</span>}
-              <span className="recorder-aside">Esc to cancel</span>
-            </motion.span>
-          ) : (
-            <motion.span key="val" className="recorder-inner" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-              <Keycaps parts={hotkeyParts(value)} />
-              <span className="recorder-aside">Click to change</span>
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
+      <div className="recorder-row">
+        <motion.button
+          ref={buttonRef}
+          type="button"
+          className={`recorder-field${recording ? " is-recording" : ""}`}
+          onClick={recording ? stop : start}
+          onBlur={() => recording && stop()}
+          whileTap={{ scale: 0.98 }}
+        >
+          <AnimatePresence mode="popLayout" initial={false}>
+            {recording ? (
+              <motion.span key="rec" className="recorder-inner" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+                {held.length ? <Keycaps parts={held} pending /> : <span className="recorder-prompt">Press a key combo or mouse button…</span>}
+                <span className="recorder-aside">Esc to cancel</span>
+              </motion.span>
+            ) : (
+              <motion.span key="val" className="recorder-inner" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+                {value ? <Keycaps parts={hotkeyParts(value)} /> : <span className="recorder-off">Off</span>}
+                <span className="recorder-aside">{value ? "Click to change" : "Click to set"}</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+        {onClear && value && !recording && (
+          <button type="button" className="btn ghost recorder-clear" onClick={async () => setError(await onClear())}>
+            Turn off
+          </button>
+        )}
+      </div>
       <AnimatePresence>
         {error && (
           <motion.p className="field-error" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>

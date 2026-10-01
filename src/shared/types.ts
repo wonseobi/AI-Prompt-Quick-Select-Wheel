@@ -20,6 +20,8 @@ export interface Config {
   version: number;
   /** "Alt+KeyF"-style key combo, or a mouse button like "Mouse4". */
   hotkey: string;
+  /** Switches to the next profile; same formats as `hotkey`, "" = off. */
+  profileHotkey: string;
   activation: Activation;
   placement: Placement;
   /** Wheel size multiplier, 0.7–1.4. */
@@ -47,6 +49,20 @@ export interface OpenPayload {
   scale: number;
   profileName: string;
   slots: Slot[];
+}
+
+/** Sent when the "next profile" shortcut switches profiles. */
+export interface ProfileSwitch {
+  profileName: string;
+  index: number;
+  total: number;
+  slots: Slot[];
+}
+
+/** Profile switched while the wheel was closed: a popup near the cursor. */
+export interface HudPayload extends ProfileSwitch {
+  x: number;
+  y: number;
 }
 
 export const SLOT_COUNT = 8;

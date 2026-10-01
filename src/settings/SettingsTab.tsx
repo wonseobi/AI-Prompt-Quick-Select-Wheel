@@ -10,7 +10,7 @@ import { HotkeyRecorder, Keycaps } from "./HotkeyRecorder";
 interface Props {
   config: Config;
   onChange: (changes: Partial<Config>) => void;
-  onHotkey: (accelerator: string) => Promise<string | null>;
+  onHotkey: (field: "hotkey" | "profileHotkey", accelerator: string) => Promise<string | null>;
 }
 
 export function SettingsTab({ config, onChange, onHotkey }: Props) {
@@ -20,12 +20,23 @@ export function SettingsTab({ config, onChange, onHotkey }: Props) {
       <div className="col">
         <section className="card">
           <div className="card-head">
-            <h2>Shortcut</h2>
-            <p className="muted">
-              The key combo or mouse button (middle, thumb buttons…) that brings up the wheel, from any app.
-            </p>
+            <h2>Shortcuts</h2>
+            <p className="muted">Key combos or mouse buttons (middle, thumb buttons…). They work from any app.</p>
           </div>
-          <HotkeyRecorder value={config.hotkey} onSave={onHotkey} />
+          <div className="shortcut-row">
+            <span className="field-label">Open the wheel</span>
+            <HotkeyRecorder value={config.hotkey} onSave={(a) => onHotkey("hotkey", a)} />
+          </div>
+          <div className="shortcut-row">
+            <span className="field-label">
+              Next profile <span className="muted">· tap it while the wheel is open to flip profiles</span>
+            </span>
+            <HotkeyRecorder
+              value={config.profileHotkey}
+              onSave={(a) => onHotkey("profileHotkey", a)}
+              onClear={() => onHotkey("profileHotkey", "")}
+            />
+          </div>
         </section>
         <GeneralCard />
         <section className="card">

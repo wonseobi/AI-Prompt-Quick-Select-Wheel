@@ -17,6 +17,7 @@ const defaultSlots: Slot[] = [
 let config: Config = {
   version: 2,
   hotkey: "Alt+KeyF",
+  profileHotkey: "Alt+KeyD",
   activation: "hold",
   placement: "cursor",
   wheelScale: 1,

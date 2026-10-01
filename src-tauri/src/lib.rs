@@ -41,21 +41,61 @@ pub fn on_trigger(app: &AppHandle, pressed: bool) {
     }
 }
 
-fn register_hotkey(app: &AppHandle, accelerator: &str) -> Result<(), String> {
+const MOUSE_NEEDS_ACCESS: &str = "Mouse buttons need Accessibility access. Turn it on first, then try again.";
+
+/// Registers the wheel hotkey and the optional "next profile" hotkey. Each can
+/// be a key combo or a mouse button.
+fn register_hotkeys(app: &AppHandle, wheel: &str, profile: &str) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
-    if let Some(button) = mouse::parse(accelerator) {
-        if !mouse::ensure_tap(app) {
-            mouse::set_binding(None);
-            return Err("Mouse buttons need Accessibility access. Turn it on first, then try again.".into());
-        }
-        mouse::set_binding(Some(button));
-        return Ok(());
+    mouse::set_bindings(None, None);
+    let (wheel_button, profile_button) = (mouse::parse(wheel), mouse::parse(profile));
+    if (wheel_button.is_some() || profile_button.is_some()) && !mouse::ensure_tap(app) {
+        return Err(MOUSE_NEEDS_ACCESS.into());
     }
-    mouse::set_binding(None);
-    shortcuts
-        .on_shortcut(accelerator, |app, _, event| on_trigger(app, event.state == ShortcutState::Pressed))
-        .map_err(|e| e.to_string())
+    if wheel_button.is_none() {
+        shortcuts
+            .on_shortcut(wheel, |app, _, event| on_trigger(app, event.state == ShortcutState::Pressed))
+            .map_err(|e| format!("That shortcut can't be used ({e}). Try another combination."))?;
+    }
+    if profile_button.is_none() && !profile.trim().is_empty() {
+        shortcuts
+            .on_shortcut(profile, |app, _, event| {
+                if event.state == ShortcutState::Pressed {
+                    next_profile(app);
+                }
+            })
+            .map_err(|e| format!("That profile shortcut can't be used ({e}). Try another combination."))?;
+    }
+    mouse::set_bindings(wheel_button, profile_button);
+    Ok(())
+}
+
+fn register_from_config(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let (wheel, profile) = {
+        let cfg = state.config.lock().unwrap();
+        (cfg.hotkey.clone(), cfg.profile_hotkey.clone())
+    };
+    register_hotkeys(app, &wheel, &profile)
+}
+
+/// Cycles to the next profile (wrapping around) from the profile hotkey.
+pub fn next_profile(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut cfg = state.config.lock().unwrap();
+        let index = cfg.profiles.iter().position(|p| p.id == cfg.active_profile).unwrap_or(0);
+        let next = (index + 1) % cfg.profiles.len();
+        cfg.active_profile = cfg.profiles[next].id.clone();
+        cfg.clone()
+    };
+    let _ = config::save(app, &cfg);
+    let _ = app.emit("config://external", &cfg);
+    refresh_tray(app);
+    let index = cfg.profiles.iter().position(|p| p.id == cfg.active_profile).unwrap_or(0);
+    let profile = cfg.active();
+    wheel::profile_switched(app, profile.name.clone(), index, cfg.profiles.len(), profile.slots.clone());
 }
 
 // ---------- settings window ----------
@@ -146,15 +186,14 @@ fn get_config(state: tauri::State<AppState>) -> Config {
 #[tauri::command]
 fn save_config(app: AppHandle, state: tauri::State<AppState>, config: Config) -> Result<Config, String> {
     let config = config.normalized();
-    let old_hotkey = state.config.lock().unwrap().hotkey.clone();
-    if config.hotkey != old_hotkey {
-        if let Err(err) = register_hotkey(&app, &config.hotkey) {
-            let _ = register_hotkey(&app, &old_hotkey);
-            return Err(if mouse::parse(&config.hotkey).is_some() {
-                err
-            } else {
-                format!("That shortcut can't be used ({err}). Try another combination.")
-            });
+    let (old_wheel, old_profile) = {
+        let cfg = state.config.lock().unwrap();
+        (cfg.hotkey.clone(), cfg.profile_hotkey.clone())
+    };
+    if config.hotkey != old_wheel || config.profile_hotkey != old_profile {
+        if let Err(err) = register_hotkeys(&app, &config.hotkey, &config.profile_hotkey) {
+            let _ = register_hotkeys(&app, &old_wheel, &old_profile);
+            return Err(err);
         }
     }
     config::save(&app, &config)?;
@@ -166,17 +205,16 @@ fn save_config(app: AppHandle, state: tauri::State<AppState>, config: Config) ->
 /// While settings records a new hotkey, the current one is switched off so the
 /// OS doesn't swallow it, and extra mouse buttons are reported instead of used.
 #[tauri::command]
-fn pause_hotkey(app: AppHandle, state: tauri::State<AppState>, paused: bool) -> Result<(), String> {
+fn pause_hotkey(app: AppHandle, paused: bool) -> Result<(), String> {
     if paused {
         let _ = app.global_shortcut().unregister_all();
-        mouse::set_binding(None);
+        mouse::set_bindings(None, None);
         mouse::ensure_tap(&app);
         mouse::set_recording(true);
         Ok(())
     } else {
         mouse::set_recording(false);
-        let hotkey = state.config.lock().unwrap().hotkey.clone();
-        register_hotkey(&app, &hotkey)
+        register_from_config(&app)
     }
 }
 
@@ -209,9 +247,12 @@ fn input_permission(app: AppHandle, state: tauri::State<AppState>) -> bool {
     let trusted = paste::has_input_permission();
     // Access was just granted: a saved mouse-button hotkey can start working now.
     if trusted && !mouse::is_available() && mouse::ensure_tap(&app) {
-        let hotkey = state.config.lock().unwrap().hotkey.clone();
-        if mouse::parse(&hotkey).is_some() {
-            let _ = register_hotkey(&app, &hotkey);
+        let uses_mouse = {
+            let cfg = state.config.lock().unwrap();
+            mouse::parse(&cfg.hotkey).is_some() || mouse::parse(&cfg.profile_hotkey).is_some()
+        };
+        if uses_mouse {
+            let _ = register_from_config(&app);
         }
     }
     trusted
@@ -279,8 +320,8 @@ pub fn run() {
             let (config, first_launch) = config::load(&handle);
             // Save right away so migrations from older versions stick.
             let _ = config::save(&handle, &config);
-            if let Err(err) = register_hotkey(&handle, &config.hotkey) {
-                eprintln!("couldn't register hotkey {}: {err}", config.hotkey);
+            if let Err(err) = register_hotkeys(&handle, &config.hotkey, &config.profile_hotkey) {
+                eprintln!("couldn't register hotkeys: {err}");
             }
             build_tray(&handle, &config)?;
             app.manage(AppState { config: Mutex::new(config), wheel: Mutex::new(Default::default()) });

@@ -25,3 +25,69 @@ body.wheel {
   position: absolute;
   translate: -50% -50%;
 }
+
+/* profile name shown above the wheel after switching profiles mid-wheel */
+.swap-tag {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(14, 16, 20, 0.92);
+  border: 1px solid rgba(143, 208, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font: 650 13px var(--font);
+}
+
+/* "switched profile" popup next to the cursor while the wheel is closed */
+.hud {
+  position: absolute;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(14, 16, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.hud-name {
+  font: 650 14px var(--font-display);
+  color: var(--text);
+}
+
+.hud-icon rect {
+  fill: rgba(255, 255, 255, 0.3);
+}
+
+.hud-icon .hot {
+  fill: var(--accent);
+}
+
+.profile-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.profile-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.profile-dots span.is-on {
+  background: var(--accent);
+  transform: scale(1.3);
+}

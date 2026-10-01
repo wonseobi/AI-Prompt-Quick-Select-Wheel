@@ -6,6 +6,8 @@ use tauri::{AppHandle, Manager};
 
 pub const SLOT_COUNT: usize = 8;
 pub const DEFAULT_HOTKEY: &str = "Alt+KeyF";
+/// Right next to F, so you can tap it while holding the wheel open.
+pub const DEFAULT_PROFILE_HOTKEY: &str = "Alt+KeyD";
 /// v1 default; too close to Cmd+Q (quit), so it's migrated to DEFAULT_HOTKEY.
 const OLD_DEFAULT_HOTKEY: &str = "Alt+KeyQ";
 const CONFIG_VERSION: u32 = 2;
@@ -61,6 +63,8 @@ pub struct Profile {
 pub struct Config {
     pub version: u32,
     pub hotkey: String,
+    /// Switches to the next profile. Empty means off.
+    pub profile_hotkey: String,
     pub activation: Activation,
     pub placement: Placement,
     /// Wheel size multiplier, MIN_SCALE..=MAX_SCALE.
@@ -77,6 +81,7 @@ impl Default for Config {
         Self {
             version: CONFIG_VERSION,
             hotkey: DEFAULT_HOTKEY.into(),
+            profile_hotkey: DEFAULT_PROFILE_HOTKEY.into(),
             activation: Activation::default(),
             placement: Placement::default(),
             wheel_scale: 1.0,
@@ -105,6 +110,9 @@ impl Config {
 
         if self.hotkey.trim().is_empty() {
             self.hotkey = DEFAULT_HOTKEY.into();
+        }
+        if self.profile_hotkey == self.hotkey {
+            self.profile_hotkey.clear();
         }
         if !self.wheel_scale.is_finite() || self.wheel_scale == 0.0 {
             self.wheel_scale = 1.0;

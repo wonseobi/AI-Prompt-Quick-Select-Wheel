@@ -87,14 +87,18 @@ export function SettingsApp() {
 
   /** Hotkeys save immediately so the backend can reject ones already taken. */
   const saveHotkey = useCallback(
-    async (hotkey: string) => {
+    async (field: "hotkey" | "profileHotkey", accelerator: string) => {
       if (!configRef.current) return null;
+      const other = field === "hotkey" ? configRef.current.profileHotkey : configRef.current.hotkey;
+      if (accelerator && accelerator === other) {
+        return field === "hotkey" ? "That's your next-profile shortcut. Pick another one." : "That already opens the wheel. Pick another one.";
+      }
       clearTimeout(saveTimer.current);
       try {
-        const next = await api.saveConfig({ ...configRef.current, hotkey });
+        const next = await api.saveConfig({ ...configRef.current, [field]: accelerator });
         configRef.current = next;
         setConfig(next);
-        notify("Shortcut updated");
+        notify(accelerator ? "Shortcut updated" : "Shortcut turned off");
         return null;
       } catch (err) {
         return String(err);
@@ -220,6 +224,7 @@ export function SettingsApp() {
                 onDuplicate={duplicateProfile}
                 onRename={profiles.rename}
                 onDelete={profiles.remove}
+                onReorder={(list) => update({ profiles: list })}
               />
             )}
             {tab === "settings" && <SettingsTab config={config} onChange={update} onHotkey={saveHotkey} />}

@@ -14,6 +14,7 @@ interface Props {
   onDuplicate: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onReorder: (profiles: Profile[]) => void;
 }
 
 export function SlotsTab({ profiles, activeId, onSlotsChange, ...profileActions }: Props) {

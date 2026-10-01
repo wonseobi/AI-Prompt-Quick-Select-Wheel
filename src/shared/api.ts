@@ -4,7 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import type { Config, Loadout, OpenPayload, Slot } from "./types";
+import type { Config, HudPayload, Loadout, OpenPayload, ProfileSwitch, Slot } from "./types";
 import { mock } from "./mock";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
@@ -13,6 +13,10 @@ type Events = {
   "wheel://open": OpenPayload;
   "wheel://release": null;
   "wheel://dismiss": null;
+  /** Profile switched while the wheel is open: swap its slots in place. */
+  "wheel://profile": ProfileSwitch;
+  /** Profile switched while the wheel is closed: show a small popup. */
+  "wheel://hud": HudPayload;
   /** Config changed outside the settings window (e.g. profile picked from the menu bar). */
   "config://external": Config;
   /** A mouse button was pressed while recording a new hotkey, e.g. "Mouse4". */

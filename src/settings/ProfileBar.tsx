@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion, Reorder } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import type { Profile } from "../shared/types";
 
 interface Props {
@@ -10,10 +10,15 @@ interface Props {
   onDuplicate: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  /** Drag-and-drop gave the profiles a new order. */
+  onReorder: (profiles: Profile[]) => void;
 }
 
-export function ProfileBar({ profiles, activeId, onSwitch, onCreate, onDuplicate, onRename, onDelete }: Props) {
+export function ProfileBar({ profiles, activeId, onSwitch, onCreate, onDuplicate, onRename, onDelete, onReorder }: Props) {
   const [renaming, setRenaming] = useState(false);
+  const [dragging, setDragging] = useState<string | null>(null);
+  // The mouse-up that ends a drag also fires a click; don't treat it as "switch".
+  const justDragged = useRef(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const active = profiles.find((p) => p.id === activeId) ?? profiles[0];
 
@@ -38,39 +43,54 @@ export function ProfileBar({ profiles, activeId, onSwitch, onCreate, onDuplicate
   return (
     <div className="profile-bar">
       <span className="profile-bar-label">Profile</span>
-      <div className="profile-pills">
+      <Reorder.Group as="div" axis="x" values={profiles} onReorder={onReorder} className="profile-pills">
         {profiles.map((p) => {
           const on = p.id === activeId;
           return (
-            <button
+            <Reorder.Item
               key={p.id}
-              className={`profile-pill${on ? " is-on" : ""}`}
-              onClick={() => !on && onSwitch(p.id)}
-              onDoubleClick={() => on && setRenaming(true)}
-              title={on ? "Double-click to rename" : `Switch to ${p.name}`}
+              value={p}
+              as="div"
+              className={`profile-item${dragging === p.id ? " is-dragging" : ""}`}
+              dragListener={!(on && renaming)}
+              onDragStart={() => setDragging(p.id)}
+              onDragEnd={() => {
+                setDragging(null);
+                justDragged.current = performance.now();
+              }}
+              whileDrag={{ scale: 1.06, zIndex: 5 }}
             >
-              {on && <motion.span layoutId="profile-pill-bg" className="profile-pill-bg" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-              {on && renaming ? (
-                <input
-                  className="profile-rename"
-                  defaultValue={p.name}
-                  autoFocus
-                  maxLength={32}
-                  size={Math.max(6, p.name.length)}
-                  onFocus={(e) => e.target.select()}
-                  onBlur={(e) => commitRename(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename(e.currentTarget.value);
-                    if (e.key === "Escape") setRenaming(false);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span className="profile-pill-name">{p.name}</span>
-              )}
-            </button>
+              <button
+                className={`profile-pill${on ? " is-on" : ""}`}
+                onClick={() => !on && performance.now() - justDragged.current > 150 && onSwitch(p.id)}
+                onDoubleClick={() => on && setRenaming(true)}
+                title={on ? "Double-click to rename · drag to reorder" : `Switch to ${p.name} · drag to reorder`}
+              >
+                {on && <motion.span layoutId="profile-pill-bg" className="profile-pill-bg" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+                {on && renaming ? (
+                  <input
+                    className="profile-rename"
+                    defaultValue={p.name}
+                    autoFocus
+                    maxLength={32}
+                    size={Math.max(6, p.name.length)}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={(e) => commitRename(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename(e.currentTarget.value);
+                      if (e.key === "Escape") setRenaming(false);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="profile-pill-name">{p.name}</span>
+                )}
+              </button>
+            </Reorder.Item>
           );
         })}
+      </Reorder.Group>
+      <div className="profile-add">
         <motion.button className="profile-pill add" onClick={onCreate} whileTap={{ scale: 0.95 }} title="New empty profile">
           ＋ New
         </motion.button>

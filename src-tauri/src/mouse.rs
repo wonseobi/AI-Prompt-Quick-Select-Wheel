@@ -12,7 +12,7 @@ pub fn parse(accelerator: &str) -> Option<i64> {
 }
 
 #[cfg(target_os = "macos")]
-pub use mac::{ensure_tap, is_available, set_binding, set_recording};
+pub use mac::{ensure_tap, is_available, set_bindings, set_recording};
 
 #[cfg(not(target_os = "macos"))]
 mod fallback {
@@ -22,7 +22,7 @@ mod fallback {
     pub fn is_available() -> bool {
         false
     }
-    pub fn set_binding(_: Option<i64>) {}
+    pub fn set_bindings(_: Option<i64>, _: Option<i64>) {}
     pub fn set_recording(_: bool) {}
 }
 #[cfg(not(target_os = "macos"))]
@@ -49,8 +49,9 @@ mod mac {
     };
     use tauri::{AppHandle, Emitter};
 
-    /// Bound button, 1-based ("Mouse4" = 4); -1 when the hotkey is a key combo.
-    static BOUND: AtomicI64 = AtomicI64::new(-1);
+    /// Bound buttons, 1-based ("Mouse4" = 4); -1 when that hotkey is a key combo.
+    static WHEEL_BUTTON: AtomicI64 = AtomicI64::new(-1);
+    static PROFILE_BUTTON: AtomicI64 = AtomicI64::new(-1);
     /// Settings is recording a new hotkey: the next extra button press is it.
     static RECORDING: AtomicBool = AtomicBool::new(false);
     static RUNNING: AtomicBool = AtomicBool::new(false);
@@ -60,8 +61,10 @@ mod mac {
         fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
     }
 
-    pub fn set_binding(button: Option<i64>) {
-        BOUND.store(button.unwrap_or(-1), Ordering::Relaxed);
+    /// Mouse buttons for opening the wheel and for switching profiles.
+    pub fn set_bindings(wheel: Option<i64>, profile: Option<i64>) {
+        WHEEL_BUTTON.store(wheel.unwrap_or(-1), Ordering::Relaxed);
+        PROFILE_BUTTON.store(profile.unwrap_or(-1), Ordering::Relaxed);
     }
 
     pub fn set_recording(recording: bool) {
@@ -132,11 +135,16 @@ mod mac {
             }
             return CallbackResult::Drop;
         }
-        if button != BOUND.load(Ordering::Relaxed) {
+        let handle = app.clone();
+        if button == WHEEL_BUTTON.load(Ordering::Relaxed) {
+            let _ = app.run_on_main_thread(move || crate::on_trigger(&handle, pressed));
+        } else if button == PROFILE_BUTTON.load(Ordering::Relaxed) {
+            if pressed {
+                let _ = app.run_on_main_thread(move || crate::next_profile(&handle));
+            }
+        } else {
             return CallbackResult::Keep;
         }
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || crate::on_trigger(&handle, pressed));
         // Swallow it so the button doesn't also do "Back" in the browser.
         CallbackResult::Drop
     }

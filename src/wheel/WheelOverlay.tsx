@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Wheel } from "../components/Wheel";
 import { api, on } from "../shared/api";
 import { angleOf, slotFromVector, unwrapAngle } from "../shared/geometry";
-import { BASE_RADIUS, isEmpty, type OpenPayload } from "../shared/types";
+import { BASE_RADIUS, isEmpty, type HudPayload, type OpenPayload } from "../shared/types";
 
 /** Mouse must travel this far (px) from the center before a slot is aimed at. */
 const DEAD_ZONE = 26;
 const FLASH_MS = 110;
 const CANCEL_MS = 90;
+/** Popup fades out a bit before the backend hides the window (wheel.rs HUD_DURATION). */
+const HUD_MS = 900;
 
 type Phase = "hidden" | "open" | "selecting" | "cancelling";
 
@@ -18,6 +20,10 @@ export function WheelOverlay() {
   const [phase, setPhase] = useState<Phase>("hidden");
   const [hot, setHot] = useState<number | null>(null);
   const [aim, setAim] = useState<number | null>(null);
+  /** Bumped when the profile changes mid-wheel, replaying the fold-out. */
+  const [swapCount, setSwapCount] = useState(0);
+  const [swapTag, setSwapTag] = useState<{ name: string; index: number; total: number } | null>(null);
+  const [hud, setHud] = useState<(HudPayload & { id: number }) | null>(null);
 
   // Event listeners are registered once, so they read live values from refs.
   const live = useRef({ session, phase, hot, openedAt: 0 });
@@ -60,8 +66,18 @@ export function WheelOverlay() {
         setOpenCount((n) => n + 1);
         setHot(null);
         setAim(null);
+        setHud(null);
+        setSwapTag(null);
         setPhase("open");
       }),
+      // "Next profile" pressed while the wheel is open: same wheel, new slots.
+      on("wheel://profile", ({ profileName, index, total, slots }) => {
+        setSession((s) => s && { ...s, profileName, slots });
+        setSwapCount((n) => n + 1);
+        setSwapTag({ name: profileName, index, total });
+      }),
+      // Pressed while the wheel is closed: a small popup by the cursor.
+      on("wheel://hud", (payload) => setHud({ ...payload, id: performance.now() })),
       // Hold mode: letting go of the hotkey picks whatever is aimed at.
       on("wheel://release", () => {
         const { hot } = live.current;
@@ -96,6 +112,18 @@ export function WheelOverlay() {
       window.removeEventListener("blur", onBlur);
     };
   }, [cancel, pick]);
+
+  useEffect(() => {
+    if (!hud) return;
+    const t = setTimeout(() => setHud(null), HUD_MS);
+    return () => clearTimeout(t);
+  }, [hud]);
+
+  useEffect(() => {
+    if (!swapTag) return;
+    const t = setTimeout(() => setSwapTag(null), 1100);
+    return () => clearTimeout(t);
+  }, [swapTag]);
 
   const onMouseMove = (e: React.MouseEvent) => {
     if (!session || phase !== "open") return;
@@ -149,7 +177,23 @@ export function WheelOverlay() {
           }
           transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
         >
+          <AnimatePresence>
+            {swapTag && (
+              <motion.div
+                key={swapTag.name + swapCount}
+                className="swap-tag"
+                initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: "spring", stiffness: 600, damping: 32 }}
+              >
+                <ProfileDots index={swapTag.index} total={swapTag.total} />
+                {swapTag.name}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <Wheel
+            key={swapCount}
             slots={session.slots}
             radius={BASE_RADIUS[session.placement] * session.scale}
             hot={hot}
@@ -159,6 +203,49 @@ export function WheelOverlay() {
           />
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {hud && !visible && (
+          <motion.div
+            key={hud.id}
+            className="hud"
+            style={{
+              left: Math.min(Math.max(hud.x, 140), window.innerWidth - 140),
+              top: Math.min(hud.y + 34, window.innerHeight - 60),
+            }}
+            initial={{ opacity: 0, y: -6, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+            transition={{ type: "spring", stiffness: 600, damping: 30 }}
+          >
+            <MiniWheel />
+            <span className="hud-name">{hud.profileName}</span>
+            <ProfileDots index={hud.index} total={hud.total} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/** Which profile out of how many, as a row of dots. */
+function ProfileDots({ index, total }: { index: number; total: number }) {
+  return (
+    <span className="profile-dots">
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={i === index ? "is-on" : undefined} />
+      ))}
+    </span>
+  );
+}
+
+function MiniWheel() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" className="hud-icon" aria-hidden>
+      {Array.from({ length: 8 }, (_, i) => (
+        <rect key={i} x="10.6" y="1.5" width="2.8" height="6" rx="1.2" transform={`rotate(${i * 45} 12 12)`} className={i === 0 ? "hot" : undefined} />
+      ))}
+      <circle cx="12" cy="12" r="2.2" className="hot" />
+    </svg>
   );
 }
