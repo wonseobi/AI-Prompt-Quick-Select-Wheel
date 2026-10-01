@@ -28,7 +28,7 @@ pub struct AppState {
 pub fn on_trigger(app: &AppHandle, pressed: bool) {
     let activation = app.state::<AppState>().config.lock().unwrap().activation;
     let (open, picker) = wheel::mode(app);
-    if picker {
+    if open && picker {
         return; // the profile picker is up; finish with it first
     }
     match (pressed, open) {

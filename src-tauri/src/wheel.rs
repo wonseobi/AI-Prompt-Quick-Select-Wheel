@@ -138,6 +138,7 @@ pub fn close(app: &AppHandle) {
         return;
     }
     wheel.open = false;
+    wheel.picker = false;
     let Some(win) = app.get_webview_window(WHEEL_LABEL) else { return };
     if let Some(pos) = wheel.restore_cursor.take() {
         let _ = win.set_cursor_position(pos);
